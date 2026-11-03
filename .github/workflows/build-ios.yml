@@ -1,0 +1,46 @@
+name: Build BotWRecomp iOS Player
+on:
+  workflow_dispatch: # Allows you to manually trigger the build with a button
+
+jobs:
+  build-ios:
+    runs-on: macos-14 # Boots up a modern M-series Mac VM in the cloud
+    steps:
+      - name: Checkout Repository Source
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup CMake & Build Tools
+        run: |
+          brew install cmake ninja
+
+      - name: Configure CMake for iOS
+        run: |
+          mkdir build && cd build
+          cmake .. -G Ninja \
+            -DCMAKE_SYSTEM_NAME=iOS \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=16.0 \
+            -DCMAKE_XCODE_ATTRIBUTE_DEVELOPMENT_TEAM="" \
+            -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY="" \
+            -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_REQUIRED=NO \
+            -DCMAKE_XCODE_ATTRIBUTE_CODE_SIGNING_ALLOWED=NO
+
+      - name: Build Executable Wrapper
+        run: |
+          cd build
+          ninja
+
+      - name: Package App Container into IPA
+        run: |
+          mkdir -p Payload/BotWRecomp.app
+          # Copies compiled binary and engine framework outputs to Payload folder
+          cp -r build/bin/* Payload/BotWRecomp.app/ 2>/dev/null || cp -r build/* Payload/BotWRecomp.app/
+          # Zips container into an installation file
+          zip -r BotWRecomp.ipa Payload
+
+      - name: Upload Completed App Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: BotWRecomp-iOS-App
+          path: BotWRecomp.ipa
